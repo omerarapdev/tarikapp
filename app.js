@@ -1,6 +1,6 @@
 import { buildBank, SUBJECTS, validateQuestion } from './bank.js';
 import { selectQuestion, prepareChoices, adjustLevel, questionStats } from './engine.js';
-import { loadState, saveState, validateState } from './storage.js';
+import { loadState, saveState, validateState, RECENT_LIMIT } from './storage.js';
 
 const translations = {
   en: {
@@ -8,7 +8,7 @@ const translations = {
     hello:'Hello, explorer', title:'Little steps.<br>Big discoveries.', intro:'Pick something you like. We’ll take it one question at a time.',
     pace:'Your pace, always', listen:'Listen when you like', short:'Small, gentle sessions', activities:'What shall we explore?', activitiesSub:'Choose your own adventure.',
     math:'Number World', vocabulary:'Word Garden', reading:'Story Time', everyday:'Everyday Adventures',
-    mathDesc:'Count, add, and spot patterns.', vocabularyDesc:'Meet new words and their meanings.', readingDesc:'Little stories. Lovely discoveries.', everydayDesc:'Practice asking, choosing, and caring.',
+    mathDesc:'Count, add, and spot patterns.', vocabularyDesc:'Pictures, letters, and little word games.', readingDesc:'Fresh stories to read and explore.', everydayDesc:'Practice asking, choosing, and caring.',
     explore:'Let’s explore', questions:'questions', available:'ready to explore', fresh:'Fresh questions every time', freshDesc:'A growing bank of numbers, words, stories, and everyday moments.',
     grownups:'A little space for grown-ups', grownupsDesc:'Make learning feel right for your child.', openParent:'Open parent space',
     noRush:'No rush. Breaks are always welcome.', local:'Progress and settings stay in this browser.', start:'Start practice', level:'Starting level',
@@ -36,7 +36,7 @@ const translations = {
     voiceFallback:'A Turkish voice is not installed on this device. Your device will choose its available voice.',
     used:'Used this session', firstTry:'first try', preview:'Preview', resetEdit:'Use original question', enabledCount:'included',
     helpTitle:'A little help', today:'Today', privacy:'No account needed. No child’s name or diagnosis is collected.',
-    bankNote:'Number questions are generated from checked templates. Words, stories, and everyday questions use a built-in bank. Your own questions are included too.',
+    bankNote:'Stories vary their characters, places, objects, colors, and events. Word games explore pictures, letters, meanings, categories, sentences, and opposites. Recently seen stories and words are avoided when fresh ones are available. Your own questions are included too.',
     searchPlaceholder:'Find a word, story, or question…', questionSaved:'Your question is ready.', backupCount:'custom questions',
     zero:'No sessions yet', choiceRead:'Listen to answers', two:'2 choices', three:'3 choices'
   },
@@ -45,7 +45,7 @@ const translations = {
     hello:'Merhaba, küçük kâşif', title:'Küçük adımlar.<br>Büyük keşifler.', intro:'Sevdiğin bir etkinlik seç. Her seferinde bir soruyla ilerleyelim.',
     pace:'Her zaman kendi hızında', listen:'İstersen dinle', short:'Kısa ve sakin çalışmalar', activities:'Neyi keşfedelim?', activitiesSub:'Kendi maceranı seç.',
     math:'Sayı Dünyası', vocabulary:'Kelime Bahçesi', reading:'Hikâye Zamanı', everyday:'Günlük Maceralar',
-    mathDesc:'Say, topla, örüntüleri keşfet.', vocabularyDesc:'Yeni kelimeler ve anlamlarıyla tanış.', readingDesc:'Küçük hikâyeler. Güzel keşifler.', everydayDesc:'İstemeyi, seçmeyi ve özen göstermeyi dene.',
+    mathDesc:'Say, topla, örüntüleri keşfet.', vocabularyDesc:'Resimler, harfler ve kelime oyunları.', readingDesc:'Her çalışmada yeni hikâyeler.', everydayDesc:'İstemeyi, seçmeyi ve özen göstermeyi dene.',
     explore:'Hadi keşfedelim', questions:'soru', available:'keşfetmeye hazır', fresh:'Her çalışmada farklı sorular', freshDesc:'Sayılar, kelimeler, hikâyeler ve günlük anlarla büyüyen bir soru bankası.',
     grownups:'Büyükler için küçük bir alan', grownupsDesc:'Öğrenmeyi çocuğunuza uygun hâle getirin.', openParent:'Ebeveyn alanını aç',
     noRush:'Acele yok. İstediğin zaman mola verebilirsin.', local:'İlerleme ve ayarlar bu tarayıcıda saklanır.', start:'Çalışmaya başla', level:'Başlangıç seviyesi',
@@ -73,7 +73,7 @@ const translations = {
     voiceFallback:'Bu cihazda Türkçe ses yüklü değil. Cihazınız mevcut seslerinden birini seçecek.',
     used:'Bu çalışmada kullanıldı', firstTry:'ilk deneme', preview:'Önizleme', resetEdit:'Özgün soruya dön', enabledCount:'dâhil',
     helpTitle:'Biraz yardım', today:'Bugün', privacy:'Hesap gerekmez. Çocuğun adı veya tanısı toplanmaz.',
-    bankNote:'Sayı soruları doğrulanmış şablonlardan üretilir. Kelimeler, hikâyeler ve günlük sorular hazır bankadan gelir. Eklediğiniz sorular da çalışmalara katılır.',
+    bankNote:'Hikâyelerin karakterleri, yerleri, nesneleri, renkleri ve olayları değişir. Kelime oyunlarında resimler, harfler, anlamlar, gruplar, cümleler ve zıt kelimeler var. Yeni seçenekler varken yakın zamanda görülen hikâye ve kelimelerden uzaklaşılır. Eklediğiniz sorular da çalışmalara katılır.',
     searchPlaceholder:'Kelime, hikâye veya soru bulun…', questionSaved:'Sorunuz hazır.', backupCount:'özel soru',
     zero:'Henüz çalışma yok', choiceRead:'Cevapları dinle', two:'2 seçenek', three:'3 seçenek'
   }
@@ -100,7 +100,7 @@ function getBank() {
   return [...buildBank(data.settings.language,data.settings.theme).map(q=>{
     const edited=data.overrides[q.id];
     if(!edited)return q;
-    if(edited.prompt)return {...edited,id:q.id};
+    if(edited.prompt)return {...edited,id:q.id,contentKey:q.contentKey,family:q.family};
     return {...q,...edited,id:q.id};
   }),...data.custom.filter(q=>q.language===data.settings.language)];
 }
@@ -196,7 +196,9 @@ function newQuestion() {
   const q=selectQuestion(getBank(),{language:session.language,subject:session.subject,level:session.level,recent:data.progress.recent,used:session.used});
   if(!q) { if(session.results.length){finishSession();view='done';} session.question=null;render(true);return; }
   Object.assign(session,{question:q,choices:prepareChoices(q,data.settings.choices),wrong:[],assisted:false,answered:false,recorded:false,showHint:false,feedback:false});
-  session.used.push(q.id); render(true);window.scrollTo(0,0);
+  session.used.push(q.id);
+  data.progress.recent=data.progress.recent.filter(id=>id!==q.id);data.progress.recent.push(q.id);data.progress.recent=data.progress.recent.slice(-RECENT_LIMIT);persist();
+  render(true);window.scrollTo(0,0);
   if(data.settings.autoRead) readQuestion();
 }
 function record(completed) {
@@ -205,7 +207,7 @@ function record(completed) {
   const q=session.question;
   const result={id:q.id,subject:q.subject,language:q.language,level:q.level,firstTry:completed&&!session.assisted,completed,at:new Date().toISOString()};
   session.results.push(result); data.progress.results.push(result); data.progress.results=data.progress.results.slice(-5000);
-  data.progress.recent.push(q.id);data.progress.recent=data.progress.recent.slice(-100);
+  data.progress.recent=data.progress.recent.filter(id=>id!==q.id);data.progress.recent.push(q.id);data.progress.recent=data.progress.recent.slice(-RECENT_LIMIT);
   const savedSession=data.progress.sessions.find(s=>s.id===session.id);
   if(savedSession)savedSession.count=session.results.length;
   else data.progress.sessions.push({id:session.id,subject:session.subject,language:session.language,count:session.results.length,at:result.at});

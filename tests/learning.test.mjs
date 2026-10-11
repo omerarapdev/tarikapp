@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBank, validateQuestion, SUBJECTS, THEMES } from '../bank.js';
 import { prepareChoices, selectQuestion, adjustLevel, questionStats } from '../engine.js';
-import { emptyState, cleanSettings, loadState, saveState, validateState } from '../storage.js';
+import { emptyState, cleanSettings, loadState, saveState, validateState, RECENT_LIMIT } from '../storage.js';
 
 function random(seed=13) {return ()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 
 test('Every generated arithmetic question is correct in both languages and all picture themes',()=>{
   for(const language of ['en','tr'])for(const theme of Object.keys(THEMES)) {
     const bank=buildBank(language,theme);
-    assert.equal(bank.length,741);
+    assert.equal(bank.length,7457);
     assert.equal(new Set(bank.map(q=>q.id)).size,bank.length);
     for(const q of bank) {
       assert.doesNotThrow(()=>validateQuestion(q),q.id);
@@ -25,6 +25,72 @@ test('Every generated arithmetic question is correct in both languages and all p
       if(q.skill==='sequence')assert.equal(Number(q.id.split('-').at(-1))+1,Number(q.answer),q.id);
     }
     for(const subject of SUBJECTS) for(const level of [1,2,3])assert.ok(bank.some(q=>q.subject===subject&&q.level===level));
+  }
+});
+
+test('Expanded vocabulary and stories have stable IDs, supported facts, and genuinely different story texts',()=>{
+  for(const language of ['en','tr']) {
+    const bank=buildBank(language),words=bank.filter(q=>q.subject==='vocabulary'),stories=bank.filter(q=>q.subject==='reading');
+    assert.equal(words.length,1030);assert.equal(stories.length,5784);
+    assert.equal(new Set(stories.map(q=>q.story.join(' '))).size,1928);
+    assert.equal(new Set(words.filter(q=>q.skill==='picture-word').map(q=>q.answer)).size,130);
+    for(const q of stories.filter(q=>q.id.includes('-gen-'))) {
+      assert.equal(q.story.length,4,q.id);
+      assert.ok(q.story.every(line=>line.length<140),q.id);
+      const text=q.story.join(' ').toLocaleLowerCase(language);
+      if(language==='en'){assert.ok(!/\ba orange\b/.test(text),q.id);assert.ok(!text.includes('in the balcony'),q.id);}
+      const answer=q.answer.toLocaleLowerCase(language).replace(/^(a|an|the) /,'').replace(/berry$/,'berr');
+      if(!['story-order','story-weather'].includes(q.skill))assert.ok(text.includes(answer),`${q.id}: ${q.answer} is absent from ${text}`);
+      if(q.skill==='story-number')assert.equal(q.choices.filter(choice=>new RegExp(`\\b${choice}\\b`).test(text)).length,1,q.id);
+      if(q.skill==='story-color') {
+        // A fruit called "orange" can occur elsewhere; check the sentence about the colored object.
+        const objects=/mat|cover|bag|bowl|bucket|umbrella|crayon|blocks|ball|pajamas|ticket|box|örtüsü|kapak|kapağı|çanta|kâse|kova|şemsiye|kap|pastel|blok|top|pijama|bilet|kutusu/;
+        const lines=q.story.map(line=>line.toLocaleLowerCase(language)).filter(line=>objects.test(line)&&q.choices.some(choice=>line.includes(choice.toLocaleLowerCase(language))));
+        assert.equal(lines.length,1,q.id);
+        assert.ok(lines[0].includes(answer),q.id);
+        assert.equal(q.choices.filter(choice=>lines[0].includes(choice.toLocaleLowerCase(language))).length,1,q.id);
+      }
+    }
+    assert.ok(bank.some(q=>q.id===`${language}-vocabulary-name-0`));
+    assert.ok(bank.some(q=>q.id===`${language}-reading-cat-0`));
+  }
+});
+
+test('Practice changes words, story texts, families, and question types across sessions',()=>{
+  const bank=buildBank('tr'),rng=random(41);
+  for(const subject of ['vocabulary','reading']) {
+    const recent=[],concepts=new Set(),ids=new Set();let previous=null;
+    for(let round=0;round<12;round++) {
+      const used=[];
+      for(let index=0;index<5;index++) {
+        const q=selectQuestion(bank,{language:'tr',subject,level:1,used,recent,random:rng});
+        assert.ok(!ids.has(q.id));assert.ok(!concepts.has(q.contentKey));
+        if(previous)assert.notEqual(q.family,previous.family);
+        if(previous&&subject==='vocabulary')assert.notEqual(q.skill,previous.skill);
+        used.push(q.id);recent.push(q.id);ids.add(q.id);concepts.add(q.contentKey);previous=q;
+      }
+    }
+    assert.equal(concepts.size,60);
+  }
+});
+
+test('Two questions about the same story or word are avoided within a session when alternatives exist',()=>{
+  const bank=buildBank('en'),rng=random(27);
+  for(const subject of ['vocabulary','reading']) {
+    const used=[],keys=new Set();
+    for(let index=0;index<10;index++) {
+      const q=selectQuestion(bank,{language:'en',subject,level:index%3+1,used,random:rng});
+      assert.ok(!keys.has(q.contentKey));keys.add(q.contentKey);used.push(q.id);
+    }
+  }
+});
+
+test('When all questions are seen, practice returns to the oldest items instead of the latest ones',()=>{
+  const bank=buildBank('en').filter(q=>q.subject==='math'&&q.skill==='add'&&q.level===2).slice(0,20);
+  const recent=bank.map(q=>q.id);
+  for(let index=0;index<20;index++) {
+    const q=selectQuestion(bank,{language:'en',subject:'math',level:2,recent,random:random(index+1)});
+    assert.ok(recent.indexOf(q.id)<10);
   }
 });
 
@@ -96,4 +162,17 @@ test('Storage failures and corrupt saves allow a fresh session without crashing'
   assert.ok(loadState(blocked).error);assert.equal(saveState(blocked,emptyState()),false);
   assert.ok(loadState({getItem:()=>'{invalid'}).error);
   assert.deepEqual(cleanSettings({length:100,level:7,language:'unknown'}),emptyState().settings);
+});
+
+test('Expanded seen-question history survives a save and reload without losing previous settings or edits',()=>{
+  const state=emptyState();state.settings.language='tr';
+  state.overrides['tr-reading-cat-0']={enabled:false};
+  const ids=buildBank('tr').filter(q=>q.subject==='reading').map(q=>q.id);
+  state.progress.recent=ids.slice(0,RECENT_LIMIT+1);
+  const storage={getItem:()=>JSON.stringify(state)};
+  const loaded=loadState(storage);
+  assert.equal(loaded.error,false);assert.equal(loaded.state.progress.recent.length,RECENT_LIMIT);
+  assert.equal(loaded.state.progress.recent[0],ids[1]);
+  assert.equal(loaded.state.settings.language,'tr');
+  assert.equal(loaded.state.overrides['tr-reading-cat-0'].enabled,false);
 });

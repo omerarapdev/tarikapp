@@ -1,5 +1,6 @@
 import { SUBJECTS, validateQuestion } from './bank.js';
 const KEY = 'tarikapp-v2';
+export const RECENT_LIMIT = 5000;
 export const DEFAULTS = { language:'en', length:5, level:1, adaptive:false, choices:3, theme:'garden', largeText:false, spacing:false, autoRead:false };
 export function emptyState() { return { version:2, settings:{...DEFAULTS}, custom:[], overrides:{}, progress:{results:[],sessions:[],recent:[]} }; }
 export function cleanSettings(value = {}) {
@@ -22,7 +23,7 @@ export function validateState(value) {
     ids.add(q.id); return {...validateQuestion(q),id:q.id};
   });
   if (value.overrides && typeof value.overrides==='object' && !Array.isArray(value.overrides)) {
-    for (const [id,q] of Object.entries(value.overrides).slice(0,3000)) {
+    for (const [id,q] of Object.entries(value.overrides).slice(0,20000)) {
       if (!/^(en|tr)-(math|vocabulary|reading|everyday)-[a-zA-Z0-9-]+$/.test(id)) continue;
       if (q && typeof q==='object' && !Array.isArray(q)) state.overrides[id]= typeof q.prompt==='string' ? {...validateQuestion(q),enabled:q.enabled!==false} : {enabled:q.enabled!==false};
     }
@@ -31,7 +32,7 @@ export function validateState(value) {
   if (!Array.isArray(progress.results) || !Array.isArray(progress.sessions) || !Array.isArray(progress.recent)) throw new Error('Backup progress is invalid.');
   state.progress.results=progress.results.slice(-5000).filter(r=>r&&typeof r.id==='string'&&SUBJECTS.includes(r.subject)&&['en','tr'].includes(r.language)&&[1,2,3].includes(r.level)&&typeof r.firstTry==='boolean'&&typeof r.completed==='boolean'&&Number.isFinite(Date.parse(r.at))).map(r=>({id:r.id,subject:r.subject,language:r.language,level:r.level,firstTry:r.firstTry,completed:r.completed,at:r.at}));
   state.progress.sessions=progress.sessions.slice(-300).filter(s=>s&&SUBJECTS.includes(s.subject)&&['en','tr'].includes(s.language)&&Number.isInteger(s.count)&&s.count>=0&&s.count<=10&&Number.isFinite(Date.parse(s.at))).map(s=>({subject:s.subject,language:s.language,count:s.count,at:s.at,...(typeof s.id==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(s.id)?{id:s.id}:{})}));
-  state.progress.recent=progress.recent.filter(id=>typeof id==='string').slice(-100);
+  state.progress.recent=progress.recent.filter(id=>typeof id==='string'&&id.length<=180).slice(-RECENT_LIMIT);
   return state;
 }
 export function loadState(storage) {

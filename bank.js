@@ -1,4 +1,6 @@
 // Carefully bounded templates produce fresh practice without external AI calls.
+import { expandedVocabulary, vocabularyCatalog, distinctCategories } from './vocabulary.js';
+import { generatedStories } from './stories.js';
 export const SUBJECTS = ['math', 'vocabulary', 'reading', 'everyday'];
 export const THEMES = { garden: ['🌻','🍎','🌿'], animals: ['🐱','🐶','🐰'], trains: ['🚂','🚃','🚋'], space: ['⭐','🚀','🪐'] };
 const words = [
@@ -10,7 +12,7 @@ const words = [
   ['milk','süt','🥛','It is a white drink.','Beyaz bir içecek.'], ['water','su','💧','We drink it when we are thirsty.','Susayınca içeriz.'],
   ['sun','güneş','☀️','It shines in the sky during the day.','Gündüz gökyüzünde parlar.'], ['moon','ay','🌙','We can see it in the night sky.','Gece gökyüzünde görebiliriz.'],
   ['star','yıldız','⭐','It twinkles in the night sky.','Gece gökyüzünde parlar.'], ['rain','yağmur','🌧️','Drops of water fall from clouds.','Bulutlardan su damlaları düşer.'],
-  ['tree','ağaç','🌳','It has a trunk and leaves.','Gövdesi ve yaprakları var.'], ['flower','çiçek','🌻','It grows in the garden.','Bahçede yetişir.'],
+  ['tree','ağaç','🌳','It has a trunk and leaves.','Gövdesi ve yaprakları var.'], ['flower','çiçek','🌻','It has petals and grows on a plant.','Bir bitkinin renkli taç yaprakları olan bölümü.'],
   ['book','kitap','📚','We can read it.','Onu okuyabiliriz.'], ['pencil','kalem','✏️','We can draw with it.','Onunla resim çizebiliriz.'],
   ['ball','top','⚽','We can kick it.','Ona ayakla vurabiliriz.'], ['bike','bisiklet','🚲','We pedal to ride it.','Binmek için pedal çeviririz.'],
   ['train','tren','🚂','It travels on rails.','Rayların üzerinde gider.'], ['bus','otobüs','🚌','It carries people on the road.','Yolda insanları taşır.'],
@@ -57,7 +59,10 @@ function numbers(answer, max = 20) {
   }
   return options.map(String);
 }
+const bankCache = new Map();
 export function buildBank(language = 'en', theme = 'garden') {
+  const cacheKey=`${language}-${theme}`;
+  if(bankCache.has(cacheKey))return bankCache.get(cacheKey);
   const tr = language === 'tr';
   const bank = [];
   const pictures = THEMES[theme] || THEMES.garden;
@@ -84,19 +89,25 @@ export function buildBank(language = 'en', theme = 'garden') {
     const sequence = level === 1 ? [0,1,0,1] : level === 2 ? [0,0,1,0,0,1] : [0,1,2,0,1,2];
     add('math',`pattern-${level}`,level,tr?'Sırada hangisi var?':'What comes next?',[...pictures],pictures[0],{skill:'pattern',visual:{kind:'pattern',items:[...sequence.map(i=>pictures[i]),'?']},hint:tr?'Tekrar eden resim grubunu bul.':'Find the group of pictures that repeats.'});
   }
+  const catalog=vocabularyCatalog(words);
   words.forEach((word, i) => {
     const name = word[tr?1:0];
-    const distractors = [words[(i+7)%words.length][tr?1:0],words[(i+15)%words.length][tr?1:0]];
-    add('vocabulary',`name-${i}`,1,tr?'Bu resimde ne var?':'What is in this picture?',[name,...distractors],name,{skill:'picture-word',visual:{kind:'single',items:[word[2]]},hint:word[tr?4:3]});
-    add('vocabulary',`clue-${i}`,2,word[tr?4:3],[name,...distractors],name,{skill:'word-meaning',hint:tr?`İlk harfi: ${name[0].toLocaleUpperCase('tr')}.`:`Its first letter is ${name[0].toUpperCase()}.`});
+    const allowedCategories=distinctCategories(catalog[i][5]);
+    const otherWords=catalog.filter(other=>allowedCategories.includes(other[5]));
+    const distractors=[otherWords[(i*7)%otherWords.length][tr?1:0],otherWords[(i*7+23)%otherWords.length][tr?1:0]];
+    const shared={contentKey:`${language}-word-${i}`,family:catalog[i][5]};
+    add('vocabulary',`name-${i}`,1,tr?'Bu resimde ne var?':'What is in this picture?',[name,...distractors],name,{...shared,skill:'picture-word',visual:{kind:'single',items:[word[2]]},hint:word[tr?4:3]});
+    add('vocabulary',`clue-${i}`,2,word[tr?4:3],[name,...distractors],name,{...shared,skill:'word-meaning',hint:tr?`İlk harfi: ${name[0].toLocaleUpperCase('tr')}.`:`Its first letter is ${name[0].toUpperCase()}.`});
   });
   opposites.forEach((word, i) => {
     const name = word[tr?1:0], answer = word[tr?3:2];
     const other = opposites[(i+3)%opposites.length];
-    add('vocabulary',`opposite-${i}`,3,tr?`“${name}” kelimesinin zıttı ne?`:`What is the opposite of “${name}”?`,[answer,name,other[tr?3:2]],answer,{skill:'opposites',hint:tr?'Ters anlamlı kelimeyi seç.':'Choose the word with the reverse meaning.'});
+    add('vocabulary',`opposite-${i}`,3,tr?`“${name}” kelimesinin zıttı ne?`:`What is the opposite of “${name}”?`,[answer,name,other[tr?3:2]],answer,{contentKey:`${language}-opposites-${i}`,family:'opposites',skill:'opposites',hint:tr?'Ters anlamlı kelimeyi seç.':'Choose the word with the reverse meaning.'});
   });
-  for (const story of stories) story.qs.forEach((q,i)=>add('reading',`${story.id}-${i}`,i+1,q[tr?1:0],q[tr?3:2],q[tr?3:2][q[4]],{skill:'comprehension',story:story[language],visual:{kind:'single',items:[story.emoji]},hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'}));
+  bank.push(...expandedVocabulary(language,words,opposites),...generatedStories(language));
+  for (const story of stories) story.qs.forEach((q,i)=>add('reading',`${story.id}-${i}`,i+1,q[tr?1:0],q[tr?3:2],q[tr?3:2][q[4]],{contentKey:`${language}-story-legacy-${story.id}`,family:story.id,skill:'comprehension',story:story[language],visual:{kind:'single',items:[story.emoji]},hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'}));
   for (const row of everyday) add('everyday',row[0],row[2],row[tr?6:5],row[tr?8:7],row[tr?8:7][0],{skill:'everyday',story:row[tr?4:3],visual:{kind:'single',items:[row[1]]},hint:row[tr?10:9],explanation:row[tr?10:9]});
+  bankCache.set(cacheKey,bank);
   return bank;
 }
 export function validateQuestion(input) {
