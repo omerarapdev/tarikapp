@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { buildBank, validateQuestion, SUBJECTS, THEMES } from '../bank.js';
 import { prepareChoices, selectQuestion, adjustLevel, questionStats } from '../engine.js';
 import { emptyState, cleanSettings, loadState, saveState, validateState, RECENT_LIMIT } from '../storage.js';
+import { MORE_STORY_TEMPLATES } from '../more-stories.js';
 
 function random(seed=13) {return ()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 
 test('Every generated arithmetic question is correct in both languages and all picture themes',()=>{
   for(const language of ['en','tr'])for(const theme of Object.keys(THEMES)) {
     const bank=buildBank(language,theme);
-    assert.equal(bank.length,7457);
+    assert.equal(bank.length,24737);
     assert.equal(new Set(bank.map(q=>q.id)).size,bank.length);
     for(const q of bank) {
       assert.doesNotThrow(()=>validateQuestion(q),q.id);
@@ -31,8 +32,8 @@ test('Every generated arithmetic question is correct in both languages and all p
 test('Expanded vocabulary and stories have stable IDs, supported facts, and genuinely different story texts',()=>{
   for(const language of ['en','tr']) {
     const bank=buildBank(language),words=bank.filter(q=>q.subject==='vocabulary'),stories=bank.filter(q=>q.subject==='reading');
-    assert.equal(words.length,1030);assert.equal(stories.length,5784);
-    assert.equal(new Set(stories.map(q=>q.story.join(' '))).size,1928);
+    assert.equal(words.length,1030);assert.equal(stories.length,23064);
+    assert.equal(new Set(stories.map(q=>q.story.join(' '))).size,4808);
     assert.equal(new Set(words.filter(q=>q.skill==='picture-word').map(q=>q.answer)).size,130);
     for(const q of stories.filter(q=>q.id.includes('-gen-'))) {
       assert.equal(q.story.length,4,q.id);
@@ -72,6 +73,60 @@ test('Practice changes words, story texts, families, and question types across s
     }
     assert.equal(concepts.size,60);
   }
+});
+
+test('Reading questions contain no answer-revealing pictures, including every original story',()=>{
+  for(const language of ['tr','en']) {
+    const questions=buildBank(language).filter(q=>q.subject==='reading');
+    assert.equal(questions.filter(q=>q.id.includes('-reading-gen-')).length,5760);
+    assert.equal(questions.filter(q=>!q.id.includes('-gen-')&&!q.id.includes('-new-')).length,24);
+    for(const q of questions) {
+      assert.equal(q.visual,undefined,q.id);
+      assert.ok(!/\p{Extended_Pictographic}/u.test([q.prompt,...q.story,...q.choices].join(' ')),q.id);
+    }
+  }
+});
+
+test('New story questions are grounded in their text and vary problems, solutions, outcomes and skills',()=>{
+  for(const language of ['tr','en']) {
+    const questions=buildBank(language).filter(q=>q.id.includes('-reading-new-'));
+    assert.equal(questions.length,17280);
+    const normalize=text=>text.toLocaleLowerCase(language).replace(/^(a|an|the) /,'');
+    const paths=new Map();
+    for(const q of questions) {
+      assert.equal(q.story.length,5,q.id);
+      assert.ok(q.story.every(line=>line.length<=180),q.id);
+      assert.equal(new Set(q.choices).size,3,q.id);
+      if(q.skill!=='story-main-idea') {
+        const evidence=normalize(q.story[q.evidenceLine]);
+        assert.ok(evidence.includes(normalize(q.answer)),q.id+': '+q.answer);
+        if(['story-cause','story-sequence','story-result','story-number'].includes(q.skill)) {
+          const matches=q.choices.filter(choice=>q.skill==='story-number'?new RegExp('\\b'+choice+'\\b').test(evidence):evidence.includes(normalize(choice)));
+          assert.deepEqual(matches,[q.answer],q.id);
+        }
+      }
+      if(q.skill==='story-cause') {
+        if(!paths.has(q.family))paths.set(q.family,new Set());
+        paths.get(q.family).add(q.answer);
+      }
+    }
+    assert.equal(paths.size,24);
+    for(const answers of paths.values())assert.equal(answers.size,3);
+    for(const template of MORE_STORY_TEMPLATES)for(const level of [1,2,3]) {
+      const atLevel=questions.filter(q=>q.family===template.id&&q.level===level);
+      assert.equal(atLevel.length,240,template.id);
+      assert.equal(new Set(atLevel.map(q=>q.skill)).size,2,template.id);
+    }
+  }
+});
+
+test('Expanded story-bank exclusions beyond 20000 entries survive backup import',()=>{
+  const state=emptyState();
+  const questions=buildBank('tr').filter(q=>q.subject==='reading');
+  state.overrides=Object.fromEntries(questions.map(q=>[q.id,{enabled:false}]));
+  const restored=validateState(JSON.parse(JSON.stringify(state)));
+  assert.equal(Object.keys(restored.overrides).length,questions.length);
+  assert.deepEqual(restored.overrides[questions.at(-1).id],{enabled:false});
 });
 
 test('Two questions about the same story or word are avoided within a session when alternatives exist',()=>{

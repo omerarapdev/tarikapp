@@ -23,7 +23,7 @@ export function validateState(value) {
     ids.add(q.id); return {...validateQuestion(q),id:q.id};
   });
   if (value.overrides && typeof value.overrides==='object' && !Array.isArray(value.overrides)) {
-    for (const [id,q] of Object.entries(value.overrides).slice(0,20000)) {
+    for (const [id,q] of Object.entries(value.overrides).slice(0,50000)) {
       if (!/^(en|tr)-(math|vocabulary|reading|everyday)-[a-zA-Z0-9-]+$/.test(id)) continue;
       if (q && typeof q==='object' && !Array.isArray(q)) state.overrides[id]= typeof q.prompt==='string' ? {...validateQuestion(q),enabled:q.enabled!==false} : {enabled:q.enabled!==false};
     }

@@ -7,7 +7,7 @@ const server = createServer(async (req, res) => {
   try {
     const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     const file = resolve(root, '.' + (path === '/' || ['/math','/vocabulary','/reading','/reading-tr','/social-stories'].includes(path) ? '/index.html' : path));
-    if (!file.startsWith(root + sep) || path.split('/').some(p => p.startsWith('.')) || !['index.html','app.js','styles.css','bank.js','vocabulary.js','stories.js','engine.js','storage.js','icon.svg','manifest.webmanifest','sw.js'].includes(file.slice(root.length + 1))) { res.writeHead(404); res.end('Not found'); return; }
+    if (!file.startsWith(root + sep) || path.split('/').some(p => p.startsWith('.')) || !['index.html','app.js','styles.css','bank.js','vocabulary.js','stories.js','more-stories.js','engine.js','storage.js','icon.svg','manifest.webmanifest','sw.js'].includes(file.slice(root.length + 1))) { res.writeHead(404); res.end('Not found'); return; }
     const content = await readFile(file);
     res.writeHead(200, { 'Content-Type': types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(content);

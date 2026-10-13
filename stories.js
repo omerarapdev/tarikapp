@@ -58,7 +58,7 @@ export function generatedStories(language='en') {
     const content=template.make(storyContext(variant));
     content.questions.forEach((question,index)=>{
       const choices=tr?question.trChoices:question.enChoices;
-      bank.push({id:`${language}-reading-gen-${template.id}-${variant}-${index}`,language,subject:'reading',level:index+1,prompt:tr?question.tr:question.en,choices,answer:choices[0],enabled:true,skill:question.skill,story:content[language].map(line=>sentence(line,language)),visual:{kind:'single',items:[content.emoji]},family:template.id,contentKey:`${language}-story-${template.id}-${variant}`,hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'});
+      bank.push({id:`${language}-reading-gen-${template.id}-${variant}-${index}`,language,subject:'reading',level:index+1,prompt:tr?question.tr:question.en,choices,answer:choices[0],enabled:true,skill:question.skill,story:content[language].map(line=>sentence(line,language)),family:template.id,contentKey:`${language}-story-${template.id}-${variant}`,hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'});
     });
   }
   return bank;

@@ -1,6 +1,7 @@
 // Carefully bounded templates produce fresh practice without external AI calls.
 import { expandedVocabulary, vocabularyCatalog, distinctCategories } from './vocabulary.js';
 import { generatedStories } from './stories.js';
+import { moreStories } from './more-stories.js';
 export const SUBJECTS = ['math', 'vocabulary', 'reading', 'everyday'];
 export const THEMES = { garden: ['🌻','🍎','🌿'], animals: ['🐱','🐶','🐰'], trains: ['🚂','🚃','🚋'], space: ['⭐','🚀','🪐'] };
 const words = [
@@ -60,6 +61,7 @@ function numbers(answer, max = 20) {
   return options.map(String);
 }
 const bankCache = new Map();
+const readingCache = new Map();
 export function buildBank(language = 'en', theme = 'garden') {
   const cacheKey=`${language}-${theme}`;
   if(bankCache.has(cacheKey))return bankCache.get(cacheKey);
@@ -104,8 +106,9 @@ export function buildBank(language = 'en', theme = 'garden') {
     const other = opposites[(i+3)%opposites.length];
     add('vocabulary',`opposite-${i}`,3,tr?`“${name}” kelimesinin zıttı ne?`:`What is the opposite of “${name}”?`,[answer,name,other[tr?3:2]],answer,{contentKey:`${language}-opposites-${i}`,family:'opposites',skill:'opposites',hint:tr?'Ters anlamlı kelimeyi seç.':'Choose the word with the reverse meaning.'});
   });
-  bank.push(...expandedVocabulary(language,words,opposites),...generatedStories(language));
-  for (const story of stories) story.qs.forEach((q,i)=>add('reading',`${story.id}-${i}`,i+1,q[tr?1:0],q[tr?3:2],q[tr?3:2][q[4]],{contentKey:`${language}-story-legacy-${story.id}`,family:story.id,skill:'comprehension',story:story[language],visual:{kind:'single',items:[story.emoji]},hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'}));
+  if(!readingCache.has(language))readingCache.set(language,[...generatedStories(language),...moreStories(language)]);
+  bank.push(...expandedVocabulary(language,words,opposites),...readingCache.get(language));
+  for (const story of stories) story.qs.forEach((q,i)=>add('reading',`${story.id}-${i}`,i+1,q[tr?1:0],q[tr?3:2],q[tr?3:2][q[4]],{contentKey:`${language}-story-legacy-${story.id}`,family:story.id,skill:'comprehension',story:story[language],hint:tr?'Cevabı bulmak için hikâyeyi tekrar oku veya dinle.':'Read or listen to the story again to find the answer.'}));
   for (const row of everyday) add('everyday',row[0],row[2],row[tr?6:5],row[tr?8:7],row[tr?8:7][0],{skill:'everyday',story:row[tr?4:3],visual:{kind:'single',items:[row[1]]},hint:row[tr?10:9],explanation:row[tr?10:9]});
   bankCache.set(cacheKey,bank);
   return bank;
