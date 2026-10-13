@@ -168,7 +168,7 @@ const simpleForms = {
     ['yağmurlu','yağmur yağıyor'],['meyveyi yıkamak','meyveyi yıkıyor','meyve yıkamak'],
     ['lambayı kapatmak','lambayı kapatıyor','lamba kapatmak'],['karıştırmak','karıştırıyor'],
     ['soğumalarını bekliyorlar','soğumasını beklemek','soğumalarını beklemek','soğumalarını bekliyor'],
-    ['yeşil bir yaprak','yeşil yaprak','yaprak'],['çizme','çizmeler']
+    ['yeşil bir yaprak','yeşil yaprak','yaprak'],['çizme','çizmeler'],['oyuncak ayı','ayı'],['yapboz','pazıl']
   ],
   en: [
     ['to the library','library'],['to the park','park'],['on the wall','wall'],['on the shelf','shelf'],['in a pot','pot'],
@@ -176,7 +176,7 @@ const simpleForms = {
     ['birds','bird'],['trees','tree'],['flowers','flower'],['trains','train'],['cookies','cookie'],['boots','boot'],
     ['mom','mum','mother'],['dad','father'],['grandma','grandmother'],['rainy','raining'],
     ['washing the fruit','wash the fruit'],['turning off the lamp','turn off the lamp'],['mixing','mix'],
-    ['let them cool','wait for them to cool','let the cookies cool'],['a green leaf','green leaf','leaf']
+    ['let them cool','wait for them to cool','let the cookies cool'],['a green leaf','green leaf','leaf'],['a teddy bear','teddy bear','teddy','bear'],['a puzzle','puzzle','jigsaw']
   ]
 };
 const digits = {
@@ -217,7 +217,8 @@ function forms(answer, language) {
       const index = digits[language]?.findIndex(number => normalizeAnswer(number,language) === word);
       return index >= 0 ? String(index) : word;
     }).join(' ');
-    return [text,withoutArticles,singularVerb,numeric,presentForm,...(present?[presentForm+'lar']:[])];
+    const counted = numeric.replace(/^(\d+) (tane|adet)$/,'$1');
+    return [text,withoutArticles,singularVerb,numeric,counted,presentForm,...(present?[presentForm+'lar']:[])];
   }))];
   if(formCache.size>=5000)formCache.clear();
   formCache.set(key,result);

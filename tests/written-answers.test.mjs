@@ -21,8 +21,8 @@ test('Turkish characters, articles, short place/person forms and number words ar
   for(const [lang,answer,typed] of [
     ['tr','Kırmızı','KIRMIZI'],['tr','Şeftali','seftali'],['tr','Kütüphaneye','kütüphane'],
     ['tr','Kuşlarla','kuş'],['tr','Babasıyla','baba'],['tr','3','üç'],['tr','Üç','3'],
-    ['tr','İki yıldız','2 yıldız'],['tr','Lambayı kapatmak','lambayı kapatıyor'],
-    ['en','An apple','apple'],['en','Three','3'],['en','3','three'],['en','Dad','father'],['en','Two stars','2 stars']
+    ['tr','İki yıldız','2 yıldız'],['tr','Lambayı kapatmak','lambayı kapatıyor'],['tr','3','üç tane'],['tr','Oyuncak ayı','ayı'],
+    ['en','An apple','apple'],['en','Three','3'],['en','3','three'],['en','Dad','father'],['en','Two stars','2 stars'],['en','A teddy bear','bear']
   ])assert.equal(checkWrittenAnswer(find(lang,answer),typed),'correct',answer+': '+typed);
   assert.equal(normalizeAnswer('İSTASYON,  ŞİŞE!', 'tr'),'istasyon sise');
 });
