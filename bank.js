@@ -122,5 +122,6 @@ export function validateQuestion(input) {
   if (!choices.includes(answer)) throw new Error('The correct answer must be one of the choices.');
   if (input.story != null && (!Array.isArray(input.story) || input.story.length>8 || input.story.some(x=>typeof x!=='string' || x.length>300))) throw new Error('Story must contain at most eight short lines.');
   for (const field of ['hint','explanation']) if (input[field] != null && (typeof input[field] !== 'string' || input[field].length>500)) throw new Error(`${field} must be shorter than 500 characters.`);
-  return { language, subject, level, prompt:prompt.trim(), choices:choices.map(x=>x.trim()), answer:answer.trim(), story:(input.story||[]).map(x=>x.trim()).filter(Boolean), hint:input.hint||'', explanation:input.explanation||'', skill:'custom', enabled:input.enabled!==false };
+  if (input.acceptedAnswers != null && (!Array.isArray(input.acceptedAnswers) || input.acceptedAnswers.length>12 || input.acceptedAnswers.some(x=>typeof x!=='string' || !x.trim() || x.length>120))) throw new Error('Use at most twelve short accepted answers.');
+  return { language, subject, level, prompt:prompt.trim(), choices:choices.map(x=>x.trim()), answer:answer.trim(), story:(input.story||[]).map(x=>x.trim()).filter(Boolean), hint:input.hint||'', explanation:input.explanation||'', skill:'custom', enabled:input.enabled!==false, ...(input.acceptedAnswers?.length?{acceptedAnswers:[...new Set(input.acceptedAnswers.map(x=>x.trim()))]}:{}) };
 }

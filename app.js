@@ -1,6 +1,7 @@
 import { buildBank, SUBJECTS, validateQuestion } from './bank.js';
 import { selectQuestion, prepareChoices, adjustLevel, questionStats } from './engine.js';
 import { loadState, saveState, validateState, RECENT_LIMIT } from './storage.js';
+import { checkWrittenAnswer } from './written-answers.js';
 
 const translations = {
   en: {
@@ -17,7 +18,7 @@ const translations = {
     choiceCount:'Answer choices', largeText:'Larger text', spacing:'More letter spacing', autoRead:'Read each new question aloud',
     autoHelp:'Sound starts only when practice begins. Voice availability depends on your device.', save:'Save settings', cancel:'Cancel', close:'Close',
     question:'Question', of:'of', pause:'Take a break', read:'Read aloud', stop:'Stop reading', hint:'A little help', skip:'Try another',
-    choose:'Choose an answer.', good:'You found it!', goodHelp:'You found it with a little help.', retry:'Let’s try another answer.', next:'Next question', finish:'Finish practice',
+    choose:'Choose an answer.', write:'Write your answer.', writeHelp:'A short answer is enough.', checkAnswer:'Check my answer', writtenRetry:'Read or listen again, then check your answer.', writtenEmpty:'Write an answer first. Take your time.', acceptedForms:'Other accepted written answers for stories (optional; one per line)', good:'You found it!', goodHelp:'You found it with a little help.', retry:'Let’s try another answer.', next:'Next question', finish:'Finish practice',
     hintUsed:'Help is always welcome.', paused:'Time for a little break.', pausedSub:'Stretch, sip some water, or just rest. Your question will be here.', resume:'I’m ready', homeButton:'Back to activities',
     done:'A lovely little step.', doneSub:'You made time to explore. That’s something to feel good about.', tried:'questions explored', again:'Practice again',
     parentTitle:'Make it their kind of learning.', parentSub:'Choose the pace. Follow the small steps. Add what they love.', practiced:'Questions explored', sessions:'Practice sessions', independent:'Answered independently',
@@ -29,7 +30,7 @@ const translations = {
     search:'Search questions', newQuestion:'Add a question', edit:'Edit', enabled:'Included', disabled:'Paused', noResults:'No questions match these filters.',
     previous:'Previous', page:'Page', nextPage:'Next page', correct:'Correct answer', prompt:'Question text', choice1:'Answer 1', choice2:'Answer 2', choice3:'Answer 3 (optional)',
     story:'Short story (optional; one sentence per line)', hintField:'Helpful hint (optional)', subject:'Activity', addTitle:'Make a little question.', editTitle:'Shape this question.',
-    editorHelp:'Use a short question and two or three clear choices. The answer selected below will be the correct one.', saveQuestion:'Save question',
+    editorHelp:'Use a short question and two or three clear answers. Select the correct answer below. In Story Time, children type their answer without seeing choices. You can add other short accepted forms.', saveQuestion:'Save question',
     saved:'Saved.', importError:'That backup could not be imported.', importPreview:'Restore this backup?', importExplain:'This replaces the questions, settings, and progress in this browser. Download your current backup first if you want to keep it.', restore:'Restore backup',
     storageError:'This browser could not save your data. You can still practice, and download a backup from Parent space.', empty:'There are no included questions for this activity. Add a question or switch some back on in Parent space.',
     speechError:'Read-aloud is unavailable right now. Try again, or use your device’s reading tools.', speechUnsupported:'This browser does not support read-aloud. You can use your device’s reading tools.',
@@ -54,7 +55,7 @@ const translations = {
     choiceCount:'Cevap seçenekleri', largeText:'Daha büyük yazı', spacing:'Harf aralığını artır', autoRead:'Her yeni soruyu sesli oku',
     autoHelp:'Ses, çalışma başlayınca açılır. Kullanılabilir sesler cihazınıza bağlıdır.', save:'Ayarları kaydet', cancel:'Vazgeç', close:'Kapat',
     question:'Soru', of:'/', pause:'Mola ver', read:'Sesli oku', stop:'Okumayı durdur', hint:'Biraz yardım', skip:'Başka soru dene',
-    choose:'Bir cevap seç.', good:'Buldun!', goodHelp:'Biraz yardımla buldun.', retry:'Başka bir cevap deneyelim.', next:'Sonraki soru', finish:'Çalışmayı bitir',
+    choose:'Bir cevap seç.', write:'Cevabını yaz.', writeHelp:'Kısa bir cevap yeterli.', checkAnswer:'Cevabımı kontrol et', writtenRetry:'Tekrar oku veya dinle, sonra cevabını kontrol et.', writtenEmpty:'Önce bir cevap yaz. Acele yok.', acceptedForms:'Hikâyeler için kabul edilen diğer yazılı cevaplar (isteğe bağlı; her satıra bir cevap)', good:'Buldun!', goodHelp:'Biraz yardımla buldun.', retry:'Başka bir cevap deneyelim.', next:'Sonraki soru', finish:'Çalışmayı bitir',
     hintUsed:'Yardım almak her zaman normal.', paused:'Küçük bir mola zamanı.', pausedSub:'Esne, biraz su iç veya dinlen. Soru burada seni bekliyor.', resume:'Hazırım', homeButton:'Etkinliklere dön',
     done:'Güzel bir küçük adım.', doneSub:'Keşfetmek için zaman ayırdın. Bununla mutlu olabilirsin.', tried:'soru keşfedildi', again:'Tekrar çalış',
     parentTitle:'Öğrenme ona uygun olsun.', parentSub:'Hızını seçin. Küçük adımları izleyin. Sevdiklerini ekleyin.', practiced:'Keşfedilen sorular', sessions:'Çalışma sayısı', independent:'Bağımsız cevaplar',
@@ -66,7 +67,7 @@ const translations = {
     search:'Sorularda ara', newQuestion:'Soru ekle', edit:'Düzenle', enabled:'Dâhil', disabled:'Duraklatıldı', noResults:'Bu filtrelerle eşleşen soru yok.',
     previous:'Önceki', page:'Sayfa', nextPage:'Sonraki sayfa', correct:'Doğru cevap', prompt:'Soru metni', choice1:'Cevap 1', choice2:'Cevap 2', choice3:'Cevap 3 (isteğe bağlı)',
     story:'Kısa hikâye (isteğe bağlı; her satıra bir cümle)', hintField:'Yardımcı ipucu (isteğe bağlı)', subject:'Etkinlik', addTitle:'Küçük bir soru hazırlayın.', editTitle:'Bu soruyu düzenleyin.',
-    editorHelp:'Kısa bir soru ve iki ya da üç açık seçenek kullanın. Aşağıda seçilen cevap doğru cevap olacak.', saveQuestion:'Soruyu kaydet',
+    editorHelp:'Kısa bir soru ve iki ya da üç açık cevap kullanın. Aşağıda doğru cevabı seçin. Hikâye Zamanı’nda çocuk seçenekleri görmeden cevabını yazar. Kabul edilecek başka kısa ifadeler de ekleyebilirsiniz.', saveQuestion:'Soruyu kaydet',
     saved:'Kaydedildi.', importError:'Bu yedek yüklenemedi.', importPreview:'Bu yedek geri yüklensin mi?', importExplain:'Bu tarayıcıdaki soruların, ayarların ve ilerlemenin yerini alır. Mevcut verileri saklamak için önce yedeğinizi indirin.', restore:'Yedeği geri yükle',
     storageError:'Bu tarayıcı verilerinizi kaydedemedi. Çalışmaya devam edebilir, Ebeveyn alanından yedek indirebilirsiniz.', empty:'Bu etkinlikte dâhil edilmiş soru yok. Ebeveyn alanından soru ekleyin veya soruları yeniden açın.',
     speechError:'Sesli okuma şu anda kullanılamıyor. Tekrar deneyin veya cihazınızın okuma araçlarını kullanın.', speechUnsupported:'Bu tarayıcı sesli okumayı desteklemiyor. Cihazınızın okuma araçlarını kullanabilirsiniz.',
@@ -123,11 +124,15 @@ function visuals(q) {
   if(v.kind==='groups') return `<div class="picture-groups" aria-label="${t('math')}">${v.groups.map(g=>`<div class="object-grid">${g.map(x=>pic(x)).join('')}</div>`).join(`<span class="operator" aria-hidden="true">${v.operator}</span>`)}</div>`;
   return `<div class="object-grid ${v.kind==='pattern'?'pattern':''}">${v.items.map((x,i)=>pic(x,v.kind==='subtract'&&i>=v.items.length-v.removed?'crossed':'')).join('')}</div>`;
 }
+function answerControls(q) {
+  if(q.subject==='reading') return `<form id="written-answer-form" class="written-answer-form" novalidate><label class="answer-instruction" for="written-answer">${t('write')}</label><p id="written-help">${t('writeHelp')}</p><input id="written-answer" name="writtenAnswer" type="text" value="${escape(session.draft)}" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-describedby="written-help${session.feedback&&!session.answered?' answer-feedback':''}" ${session.feedback&&!session.answered?'aria-invalid="true"':''} ${session.answered?'disabled':''}><button class="button check-answer" type="submit" ${session.answered?'disabled':''}>${icon('check')}${t('checkAnswer')}</button></form>`;
+  return `<p class="answer-instruction">${t('choose')}</p><div class="answers">${session.choices.map((choice,i)=>`<button class="answer ${session.wrong.includes(choice)?'tried':''} ${session.answered&&choice===q.answer?'correct':''}" data-action="answer" data-choice="${i}" ${session.answered||session.wrong.includes(choice)?'disabled':''}><span class="answer-text">${escape(choice)}</span>${session.answered&&choice===q.answer?icon('check'):''}</button>`).join('')}</div><button class="text-button answer-audio" data-action="read-choices">${icon('sound')}${t('choiceRead')}</button>`;
+}
 function practice() {
   if(!session?.question) return `<div class="empty-state"><h1>${t(session?.finished?'done':'empty')}</h1><button class="button" data-action="home">${t('homeButton')}</button></div>`;
   if(session.paused) return `<div class="pause-card"><div class="pause-picture">🌿</div><h1>${t('paused')}</h1><p>${t('pausedSub')}</p><button class="button" data-action="resume">${t('resume')}${icon('arrow')}</button><button class="text-button" data-action="home">${t('homeButton')}</button></div>`;
   const q=session.question, index=session.used.length;
-  return `<div class="practice-top"><button class="text-button" data-action="home">${icon('back')}${t('homeButton')}</button><button class="button secondary small" data-action="pause">${icon('pause')}${t('pause')}</button></div><div class="practice-heading"><span class="subject-label ${session.subject}">${subjectEmoji[session.subject]} ${t(session.subject)}</span><span>${t('question')} ${index} ${t('of')} ${session.length}</span></div><div class="progress-dots" aria-label="${t('question')} ${index} ${t('of')} ${session.length}">${Array.from({length:session.length},(_,i)=>`<span class="${i<index-1?'complete':i===index-1?'current':''}"></span>`).join('')}</div><section class="question-card ${data.settings.largeText?'large-text':''} ${data.settings.spacing?'spaced':''}"><button class="read-button" data-action="read">${icon(speaking?'stop':'sound')}<span>${t(speaking?'stop':'read')}</span></button>${visuals(q)}${q.story?.length?`<div class="story-text">${q.story.map(line=>`<p>${escape(line)}</p>`).join('')}</div>`:''}${q.equation?`<div class="equation" aria-hidden="true">${escape(q.equation)}</div>`:''}<h1 class="question-prompt">${escape(q.prompt)}</h1><p class="answer-instruction">${t('choose')}</p><div class="answers">${session.choices.map((choice,i)=>`<button class="answer ${session.wrong.includes(choice)?'tried':''} ${session.answered&&choice===q.answer?'correct':''}" data-action="answer" data-choice="${i}" ${session.answered||session.wrong.includes(choice)?'disabled':''}><span class="answer-text">${escape(choice)}</span>${session.answered&&choice===q.answer?icon('check'):''}</button>`).join('')}</div><button class="text-button answer-audio" data-action="read-choices">${icon('sound')}${t('choiceRead')}</button>${session.feedback?`<div class="feedback ${session.answered?'success':''}" role="status">${session.answered?icon('check'):icon('leaf')}<div><strong>${t(session.answered?(session.assisted?'goodHelp':'good'):'retry')}</strong>${session.answered&&q.explanation?`<p>${escape(q.explanation)}</p>`:''}</div></div>`:''}${session.showHint?`<div class="hint-box"><strong>${t('helpTitle')}</strong><p>${escape(q.hint||t('hintUsed'))}</p></div>`:''}${session.answered?`<button class="button next-button" data-action="next">${t(index>=session.length?'finish':'next')}${icon('arrow')}</button>`:`<div class="question-tools"><button class="button secondary" data-action="hint">${icon('help')}${t('hint')}</button><button class="text-button" data-action="skip">${t('skip')}${icon('arrow')}</button></div>`}</section>`;
+  return `<div class="practice-top"><button class="text-button" data-action="home">${icon('back')}${t('homeButton')}</button><button class="button secondary small" data-action="pause">${icon('pause')}${t('pause')}</button></div><div class="practice-heading"><span class="subject-label ${session.subject}">${subjectEmoji[session.subject]} ${t(session.subject)}</span><span>${t('question')} ${index} ${t('of')} ${session.length}</span></div><div class="progress-dots" aria-label="${t('question')} ${index} ${t('of')} ${session.length}">${Array.from({length:session.length},(_,i)=>`<span class="${i<index-1?'complete':i===index-1?'current':''}"></span>`).join('')}</div><section class="question-card ${data.settings.largeText?'large-text':''} ${data.settings.spacing?'spaced':''}"><button class="read-button" data-action="read">${icon(speaking?'stop':'sound')}<span>${t(speaking?'stop':'read')}</span></button>${visuals(q)}${q.story?.length?`<div class="story-text">${q.story.map(line=>`<p>${escape(line)}</p>`).join('')}</div>`:''}${q.equation?`<div class="equation" aria-hidden="true">${escape(q.equation)}</div>`:''}<h1 class="question-prompt">${escape(q.prompt)}</h1>${answerControls(q)}${session.feedback?`<div id="answer-feedback" class="feedback ${session.answered?'success':''}" role="status">${session.answered?icon('check'):icon('leaf')}<div><strong>${t(session.answered?(session.assisted?'goodHelp':'good'):(session.feedback==='empty'?'writtenEmpty':q.subject==='reading'?'writtenRetry':'retry'))}</strong>${session.answered&&q.explanation?`<p>${escape(q.explanation)}</p>`:''}</div></div>`:''}${session.showHint?`<div class="hint-box"><strong>${t('helpTitle')}</strong><p>${escape(q.hint||t('hintUsed'))}</p></div>`:''}${session.answered?`<button class="button next-button" data-action="next">${t(index>=session.length?'finish':'next')}${icon('arrow')}</button>`:`<div class="question-tools"><button class="button secondary" data-action="hint">${icon('help')}${t('hint')}</button><button class="text-button" data-action="skip">${t('skip')}${icon('arrow')}</button></div>`}</section>`;
 }
 function done() {
   return `<section class="completion"><div class="completion-art">${gardenArt()}</div><p class="eyebrow">${t('pace')}</p><h1>${t('done')}</h1><p>${t('doneSub')}</p><span class="completion-count">${session?.results.length||0} ${t('tried')}</span><div class="completion-actions"><button class="button" data-action="start" data-subject="${session?.subject||'math'}">${t('again')}${icon('arrow')}</button><button class="button secondary" data-action="home">${t('homeButton')}</button></div></section>`;
@@ -196,7 +201,7 @@ function newQuestion() {
   stopSpeech();
   const q=selectQuestion(getBank(),{language:session.language,subject:session.subject,level:session.level,recent:data.progress.recent,used:session.used});
   if(!q) { if(session.results.length){finishSession();view='done';} session.question=null;render(true);return; }
-  Object.assign(session,{question:q,choices:prepareChoices(q,data.settings.choices),wrong:[],assisted:false,answered:false,recorded:false,showHint:false,feedback:false});
+  Object.assign(session,{question:q,choices:q.subject==='reading'?[]:prepareChoices(q,data.settings.choices),draft:'',wrong:[],assisted:false,answered:false,recorded:false,showHint:false,feedback:false});
   session.used.push(q.id);
   data.progress.recent=data.progress.recent.filter(id=>id!==q.id);data.progress.recent.push(q.id);data.progress.recent=data.progress.recent.slice(-RECENT_LIMIT);persist();
   render(true);window.scrollTo(0,0);
@@ -234,7 +239,7 @@ function settingsDialog() {
 let editingId=null;
 function editorDialog(id=null) {
   editingId=id;const q=id?getBank().find(q=>q.id===id):null;
-  openDialog(`<p class="eyebrow">${t('bank')}</p><h2 id="dialog-title">${t(q?'editTitle':'addTitle')}</h2><p class="dialog-description">${t('editorHelp')}</p><form id="question-form"><div class="form-grid"><label>${t('language')}${languageSelect('language',q?.language||data.settings.language)}</label><label>${t('subject')}<select name="subject">${SUBJECTS.map(s=>`<option value="${s}" ${s===(q?.subject||bankFilter.subject)?'selected':''}>${t(s)}</option>`).join('')}</select></label><label class="full-width">${t('level')}<select name="level">${levelOptions(q?.level||1)}</select></label><label class="full-width">${t('story')}<textarea name="story" rows="3" maxlength="2400">${escape(q?.story?.join('\n')||'')}</textarea></label><label class="full-width">${t('prompt')}<textarea name="prompt" required maxlength="300" rows="2">${escape(q?.prompt||'')}</textarea></label>${[0,1,2].map(i=>`<label class="full-width">${t('choice'+(i+1))}<input name="choice${i}" value="${escape(q?.choices[i]||'')}" ${i<2?'required':''} maxlength="120"></label>`).join('')}<label class="full-width">${t('correct')}<select name="correct">${[0,1,2].map(i=>`<option value="${i}" ${q?.choices.indexOf(q.answer)===i?'selected':''}>${t('choice'+(i+1))}</option>`).join('')}</select></label><label class="full-width">${t('hintField')}<textarea name="hint" maxlength="500" rows="2">${escape(q?.hint||'')}</textarea></label></div><p id="form-error" class="form-error" role="alert"></p><div class="dialog-actions">${id&&!id.startsWith('custom-')?`<button type="button" class="text-button" data-action="reset-edit" data-id="${escape(id)}">${t('resetEdit')}</button>`:''}<button class="button" type="submit">${t('saveQuestion')}${icon('check')}</button></div></form>`);
+  openDialog(`<p class="eyebrow">${t('bank')}</p><h2 id="dialog-title">${t(q?'editTitle':'addTitle')}</h2><p class="dialog-description">${t('editorHelp')}</p><form id="question-form"><div class="form-grid"><label>${t('language')}${languageSelect('language',q?.language||data.settings.language)}</label><label>${t('subject')}<select name="subject">${SUBJECTS.map(s=>`<option value="${s}" ${s===(q?.subject||bankFilter.subject)?'selected':''}>${t(s)}</option>`).join('')}</select></label><label class="full-width">${t('level')}<select name="level">${levelOptions(q?.level||1)}</select></label><label class="full-width">${t('story')}<textarea name="story" rows="3" maxlength="2400">${escape(q?.story?.join('\n')||'')}</textarea></label><label class="full-width">${t('prompt')}<textarea name="prompt" required maxlength="300" rows="2">${escape(q?.prompt||'')}</textarea></label>${[0,1,2].map(i=>`<label class="full-width">${t('choice'+(i+1))}<input name="choice${i}" value="${escape(q?.choices[i]||'')}" ${i<2?'required':''} maxlength="120"></label>`).join('')}<label class="full-width">${t('correct')}<select name="correct">${[0,1,2].map(i=>`<option value="${i}" ${q?.choices.indexOf(q.answer)===i?'selected':''}>${t('choice'+(i+1))}</option>`).join('')}</select></label><label class="full-width">${t('acceptedForms')}<textarea name="acceptedAnswers" maxlength="1450" rows="3">${escape(q?.acceptedAnswers?.join('\n')||'')}</textarea></label><label class="full-width">${t('hintField')}<textarea name="hint" maxlength="500" rows="2">${escape(q?.hint||'')}</textarea></label></div><p id="form-error" class="form-error" role="alert"></p><div class="dialog-actions">${id&&!id.startsWith('custom-')?`<button type="button" class="text-button" data-action="reset-edit" data-id="${escape(id)}">${t('resetEdit')}</button>`:''}<button class="button" type="submit">${t('saveQuestion')}${icon('check')}</button></div></form>`);
 }
 function downloadBackup() {
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
@@ -260,10 +265,10 @@ document.addEventListener('click',event=>{
   if(action==='pause'){session.paused=true;stopSpeech();render(true);return;}
   if(action==='resume'){session.paused=false;render(true);return;}
   if(action==='read'){if(speaking){stopSpeech();updateReadButton();}else readQuestion();return;}
-  if(action==='read-choices'){speak(session.choices.join('. '));return;}
+  if(action==='read-choices'){if(session?.question?.subject!=='reading')speak(session.choices.join('. '));return;}
   if(action==='hint'){session.assisted=true;session.showHint=true;render();announce(t('hintUsed'));return;}
   if(action==='answer') {
-    if(session.answered)return;stopSpeech();const choice=session.choices[Number(button.dataset.choice)];session.feedback=true;
+    if(session.answered||session.question.subject==='reading')return;stopSpeech();const choice=session.choices[Number(button.dataset.choice)];session.feedback=true;
     if(choice===session.question.answer){session.answered=true;record(true);render();root.querySelector('[data-action="next"]')?.focus();}
     else {session.assisted=true;session.wrong.push(choice);render();root.querySelector('.answer:not([disabled])')?.focus();}
     return;
@@ -279,12 +284,26 @@ document.addEventListener('click',event=>{
   if(action==='import')return document.getElementById('backup-file').click();
   if(action==='restore'&&pendingBackup){data=pendingBackup;pendingBackup=null;persist();closeDialog();render();toast(t('saved'));}
 });
-document.addEventListener('input',event=>{if(event.target.id==='bank-search'){bankFilter.query=event.target.value;bankFilter.page=1;document.getElementById('bank-results').innerHTML=bankResults();}});
+document.addEventListener('input',event=>{if(event.target.id==='written-answer'&&session&&!session.answered)session.draft=event.target.value;if(event.target.id==='bank-search'){bankFilter.query=event.target.value;bankFilter.page=1;document.getElementById('bank-results').innerHTML=bankResults();}});
 document.addEventListener('change',event=>{
   if(['bank-subject','bank-level'].includes(event.target.id)){bankFilter[event.target.id==='bank-subject'?'subject':'level']=event.target.value;bankFilter.page=1;document.getElementById('bank-results').innerHTML=bankResults();}
   if(event.target.id==='backup-file') {importBackup(event.target.files[0]);event.target.value='';}
 });
 document.addEventListener('submit',event=>{
+  if(event.target.id==='written-answer-form') {
+    event.preventDefault();
+    if(view!=='practice'||!session?.question||session.question.subject!=='reading'||session.answered||session.paused)return;
+    session.draft=new FormData(event.target).get('writtenAnswer')||'';
+    const result=checkWrittenAnswer(session.question,session.draft);
+    stopSpeech();session.feedback=result==='empty'?'empty':true;
+    if(result==='correct'){session.answered=true;record(true);render();root.querySelector('[data-action="next"]')?.focus();}
+    else {
+      if(result==='incorrect'){session.assisted=true;session.wrong.push(true);}
+      render();root.querySelector('#written-answer')?.focus();
+      announce(t(result==='empty'?'writtenEmpty':'writtenRetry'));
+    }
+    return;
+  }
   if(!['settings-form','question-form'].includes(event.target.id))return;event.preventDefault();const form=new FormData(event.target);
   if(event.target.id==='settings-form') {
     const langChanged=data.settings.language!==form.get('language');
@@ -295,7 +314,7 @@ document.addEventListener('submit',event=>{
   try {
     const rawChoices=[0,1,2].map(i=>form.get('choice'+i).trim()),answer=rawChoices[Number(form.get('correct'))];
     const previous=editingId?getBank().find(q=>q.id===editingId):null;
-    const value=validateQuestion({language:form.get('language'),subject:form.get('subject'),level:Number(form.get('level')),prompt:form.get('prompt'),choices:rawChoices.filter(Boolean),answer,story:form.get('story').split('\n').filter(x=>x.trim()),hint:form.get('hint'),enabled:previous?.enabled});
+    const value=validateQuestion({language:form.get('language'),subject:form.get('subject'),level:Number(form.get('level')),prompt:form.get('prompt'),choices:rawChoices.filter(Boolean),answer,story:form.get('story').split('\n').filter(x=>x.trim()),hint:form.get('hint'),acceptedAnswers:form.get('acceptedAnswers').split('\n').filter(x=>x.trim()),enabled:previous?.enabled});
     if(editingId&&!editingId.startsWith('custom-')) {
       const original=buildBank(data.settings.language,data.settings.theme).find(q=>q.id===editingId);
       // Changed language/subject is a new question; leave the original bank entry intact.

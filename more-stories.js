@@ -1,4 +1,5 @@
 import { storyContext } from './stories.js';
+import { storyAnswerForms } from './written-answers.js';
 
 export const MORE_STORY_VARIANTS = 120;
 const upper = (text, language) => text[0].toLocaleUpperCase(language) + text.slice(1);
@@ -280,7 +281,7 @@ export function moreStories(language = 'en') {
         { prompt: column ? c.name + ' neden yardım istiyor?' : 'Why does ' + c.name + ' ask for help?', choices: [problem, ...others.map(p => p[column])], level: 2, skill: 'story-cause', evidence: 2 },
         { prompt: column ? 'Sorunu fark ettikten sonra ne yapıyorlar?' : 'What do they do next, after noticing the problem?', choices: [action, ...others.map(p => p[2 + column])], level: 2, skill: 'story-sequence', evidence: 3 },
         { prompt: column ? 'Çözümden sonra ne oluyor?' : 'What happens after their solution?', choices: [result, ...others.map(p => p[4 + column])], level: 3, skill: 'story-result', evidence: 4 },
-        { prompt: column ? 'Bu hikâyeye en uygun başlık hangisi?' : 'Which title best fits this story?', choices: titles, level: 3, skill: 'story-main-idea' }
+        { prompt: column ? 'Bu hikâye neyle ilgili? Kısaca yaz.' : 'What is this story about? Write a few words.', choices: titles, level: 3, skill: 'story-main-idea' }
       ];
       questions.forEach((question, index) => {
         const choices = question.choices.map(text => upper(text, language));
@@ -288,6 +289,7 @@ export function moreStories(language = 'en') {
           id: language + '-reading-new-' + template.id + '-' + variant + '-' + index,
           language, subject: 'reading', level: question.level, prompt: question.prompt,
           choices, answer: choices[0], enabled: true, skill: question.skill, story,
+          acceptedAnswers: storyAnswerForms(template.id, pathIndex, index, language),
           family: template.id, contentKey: language + '-story-new-' + template.id + '-' + variant,
           evidenceLine: question.evidence,
           hint: column ? 'Soruda ne istendiğine bak. Cevabı hikâyeyi tekrar okuyarak veya dinleyerek bul.' : 'Look at what the question asks. Read or listen to the story again to find the answer.'

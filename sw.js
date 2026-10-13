@@ -1,5 +1,5 @@
-const CACHE = 'tarikapp-v2-3';
-const FILES = ['./', './index.html', './app.js', './styles.css', './bank.js', './vocabulary.js', './stories.js', './more-stories.js', './engine.js', './storage.js', './icon.svg', './manifest.webmanifest'].map(path => new URL(path, self.registration.scope).href);
+const CACHE = 'tarikapp-v2-4';
+const FILES = ['./', './index.html', './app.js', './styles.css', './bank.js', './vocabulary.js', './stories.js', './more-stories.js', './written-answers.js', './engine.js', './storage.js', './icon.svg', './manifest.webmanifest'].map(path => new URL(path, self.registration.scope).href);
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(()=>self.skipWaiting())); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('tarikapp-v2-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', event => {
